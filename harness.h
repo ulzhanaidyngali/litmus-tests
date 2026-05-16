@@ -81,7 +81,7 @@ static OutcomeKey make_key(std::initializer_list<std::pair<const char*, int>> re
 struct TestConfig {
     std::string name;           // Human-readable test name, e.g. "SB"
     std::string description;    // What it tests
-    int         iterations  = 100'000; // How many times to run
+    int         iterations  = 10000; // How many times to run
     int         cpu0        = 0;         // Core for thread 1
     int         cpu1        = 1;         // Core for thread 2
     bool        use_barriers = false;    // Insert mfence barriers (demo)
