@@ -29,3 +29,19 @@ or x=2,y=1 or x=2,y=2
 On x86-TSO: all 4 outcomes are possible.
 Reason: there is no guarantee which thread
 will write the last values ​​to x and y.
+
+
+
+## DEKKER, WRC, RWC analysis
+
+### DEKKER
+Two threads write to different variables and then read each other’s values.
+The outcome r1=0 and r2=0 is possible on x86 because of store buffering.
+
+### WRC
+One thread writes x, another reads x and writes y, and the third reads both.
+The forbidden outcome violates causality and is not allowed on x86-TSO.
+
+### RWC
+Threads create a read-write dependency cycle.
+The forbidden outcome is prevented by x86 memory ordering guarantees.
