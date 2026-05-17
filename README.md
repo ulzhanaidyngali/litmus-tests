@@ -35,13 +35,49 @@ will write the last values ​​to x and y.
 ## DEKKER, WRC, RWC analysis
 
 ### DEKKER
-Two threads write to different variables and then read each other’s values.
-The outcome r1=0 and r2=0 is possible on x86 because of store buffering.
-
+The DEKKER test demonstrates how two threads interact with shared memory on modern processors.
+Thread 1 writes the value 1 to variable x and then reads variable y.
+Thread 2 writes the value 1 to variable y and then reads variable x.
+// Thread 1
+x = 1;
+r1 = y;
+// Thread 2
+y = 1;
+r2 = x;
+An interesting outcome is:
+r1 = 0
+r2 = 0
+This means that both threads failed to observe the other thread’s write operation even though both writes already happened.
+On x86 processors this behavior is possible because of the Store Buffer mechanism.
+Writes are temporarily stored inside the processor before becoming visible to other cores. Because of this delay, both threads may still read the old value 0.
+The DEKKER test demonstrates weak memory behavior and shows how hardware optimizations affect memory visibility and synchronization.
 ### WRC
-One thread writes x, another reads x and writes y, and the third reads both.
-The forbidden outcome violates causality and is not allowed on x86-TSO.
-
+The WRC test checks whether the processor preserves causality between write and read operations.
+One thread writes x = 1.
+Another thread reads x and then writes y = 1.
+The third thread reads both y and x.
+// Thread 1
+x = 1;
+// Thread 2
+r1 = x;
+y = 1;
+// Thread 3
+r2 = y;
+r3 = x;
+A forbidden outcome is:
+r2 = 1
+r3 = 0
+This result would violate causality because if a thread already observed x = 1 before writing y = 1, then any thread that sees y = 1 should also observe x = 1.
+On x86-TSO this outcome is generally impossible because the architecture preserves a relatively strong ordering of writes and memory visibility.
 ### RWC
-Threads create a read-write dependency cycle.
-The forbidden outcome is prevented by x86 memory ordering guarantees.
+The RWC test studies cyclic dependencies between reads and writes in concurrent execution.
+Threads perform reads and writes in a way that creates a dependency cycle between operations.
+// Thread 1
+r1 = y;
+x = 1;
+// Thread 2
+r2 = x;
+y = 1;
+A forbidden outcome occurs when both threads simultaneously observe values that should not yet be visible.
+On x86 processors this behavior is not allowed because the TSO memory model prevents invalid cyclic dependencies between memory operations.
+The RWC test demonstrates that x86 maintains causality and stronger memory ordering guarantees compared to weaker architectures such as ARM.
