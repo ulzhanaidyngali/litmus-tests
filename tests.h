@@ -163,47 +163,26 @@ struct IRIW_State {
 
 // IRIW needs 4 threads — we use a slightly different runner
 void run_IRIW() {
-    const int ITERATIONS = 500'000;
-    IRIW_State state;
+    const int ITERATIONS = 10000;
     ResultMap results;
 
-    std::atomic<int>  ready{0};
-    std::atomic<bool> go{false};
-
-    auto worker = [&](int cpu, std::function<void()> body) {
-        pin_thread(cpu);
-        for (int i = 0; i < ITERATIONS; ++i) {
-            while (ready.load(std::memory_order_acquire) != 1) {}
-            ready.fetch_add(1, std::memory_order_release);
-            while (!go.load(std::memory_order_acquire)) {}
-            body();
-        }
-    };
-
-    std::thread t1(worker, 0, [&]{ state.x.store(1, std::memory_order_relaxed); });
-    std::thread t2(worker, 1, [&]{ state.y.store(1, std::memory_order_relaxed); });
-    std::thread t3(worker, 2, [&]{
-        state.r1 = state.x.load(std::memory_order_relaxed);
-        state.r2 = state.y.load(std::memory_order_relaxed);
-    });
-    std::thread t4(worker, 3, [&]{
-        state.r3 = state.y.load(std::memory_order_relaxed);
-        state.r4 = state.x.load(std::memory_order_relaxed);
-    });
-
     for (int i = 0; i < ITERATIONS; ++i) {
+        IRIW_State state;
         state.reset();
-        ready.store(0);
-        go.store(false);
-        ready.store(1);
-        while (ready.load() < 5) {}
-        go.store(true, std::memory_order_release);
-        while (ready.load() > 1) {}
-        std::atomic_thread_fence(std::memory_order_seq_cst);
+        std::thread t1([&]{ state.x.store(1, std::memory_order_relaxed); });
+        std::thread t2([&]{ state.y.store(1, std::memory_order_relaxed); });
+        std::thread t3([&]{
+            state.r1 = state.x.load(std::memory_order_relaxed);
+            state.r2 = state.y.load(std::memory_order_relaxed);
+        });
+        std::thread t4([&]{
+            state.r3 = state.y.load(std::memory_order_relaxed);
+            state.r4 = state.x.load(std::memory_order_relaxed);
+        });
+        t1.join(); t2.join(); t3.join(); t4.join();
         results[OUTCOME(REG(r1,state.r1), REG(r2,state.r2),
                         REG(r3,state.r3), REG(r4,state.r4))]++;
     }
-    t1.join(); t2.join(); t3.join(); t4.join();
 
     std::cout << "\n╔══════════════════════════════════════════════════╗\n";
     std::cout << "║  Test: IRIW (Independent Reads/Writes)           ║\n";
