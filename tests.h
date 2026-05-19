@@ -1,25 +1,9 @@
-// =============================================================================
-// tests.h  —  12 Classic Litmus Tests
-// =============================================================================
-// Each test follows the same pattern:
-//   1. Struct with shared variables + reset()
-//   2. thread1_body() and thread2_body()
-//   3. observe() — reads result registers
-//   4. run_XYZ() — fills TestConfig and calls run_test()
-// =============================================================================
+
 
 #pragma once
 #include "harness.h"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 1: SB — Store Buffering
-// ─────────────────────────────────────────────────────────────────────────────
-// Thread 1:  x=1; r1=y
-// Thread 2:  y=1; r2=x
-//
-// Forbidden on SC: r1=0 && r2=0
-// Allowed on x86-TSO: YES — store buffer delays write visibility
-// ─────────────────────────────────────────────────────────────────────────────
+// SB 
 struct SB_State {
     std::atomic<int> x{0}, y{0};
     int r1{0}, r2{0};
@@ -33,19 +17,16 @@ void run_SB(bool use_barriers = false) {
     cfg.use_barriers = use_barriers;
 
     run_test<SB_State>(cfg,
-        // Thread 1
         [](SB_State& s, bool barriers) {
             s.x.store(1, std::memory_order_relaxed);
             if (barriers) MFENCE();
             s.r1 = s.y.load(std::memory_order_relaxed);
         },
-        // Thread 2
         [](SB_State& s, bool barriers) {
             s.y.store(1, std::memory_order_relaxed);
             if (barriers) MFENCE();
             s.r2 = s.x.load(std::memory_order_relaxed);
         },
-        // Observe
         [](const SB_State& s) {
             return OUTCOME(REG(r1, s.r1), REG(r2, s.r2));
         }
@@ -57,17 +38,7 @@ void run_SB(bool use_barriers = false) {
             "  and reads from memory before the other's write is flushed.\n"
             "  Result: both see the old value 0. This CANNOT happen on SC.");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 2: MP — Message Passing
-// ─────────────────────────────────────────────────────────────────────────────
-// Thread 1:  data=42; flag=1
-// Thread 2:  r1=flag; r2=data
-//
-// Forbidden on SC/TSO: r1=1 && r2=0
-// Allowed on TSO: NO (x86 preserves store→store order)
-// Allowed on ARM: YES (weak model)
-// ─────────────────────────────────────────────────────────────────────────────
+// MP
 struct MP_State {
     std::atomic<int> data{0}, flag{0};
     int r1{0}, r2{0};
@@ -102,16 +73,7 @@ void run_MP(bool use_barriers = false) {
         "  On ARMv8 (weak model) this outcome IS possible without barriers.");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 3: LB — Load Buffering
-// ─────────────────────────────────────────────────────────────────────────────
-// Thread 1:  r1=x; y=1
-// Thread 2:  r2=y; x=1
-//
-// Forbidden on SC: r1=1 && r2=1
-// Allowed on x86-TSO: NO (loads not reordered past stores on x86)
-// Allowed on ARM: YES
-// ─────────────────────────────────────────────────────────────────────────────
+// LB 
 struct LB_State {
     std::atomic<int> x{0}, y{0};
     int r1{0}, r2{0};
@@ -143,25 +105,12 @@ void run_LB() {
         "  On ARMv8 it can appear (loads can be reordered freely).");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 4: IRIW — Independent Reads of Independent Writes
-// ─────────────────────────────────────────────────────────────────────────────
-// Thread 1:  x=1
-// Thread 2:  y=1
-// Thread 3:  r1=x; r2=y
-// Thread 4:  r3=y; r4=x
-//
-// Forbidden on SC: r1=1,r2=0 AND r3=1,r4=0 simultaneously
-// Allowed on x86-TSO: NO (x86 has a single total store order)
-// Allowed on ARM: YES
-// ─────────────────────────────────────────────────────────────────────────────
+// IRIW 
 struct IRIW_State {
     std::atomic<int> x{0}, y{0};
     int r1{0}, r2{0}, r3{0}, r4{0};
     void reset() { x=0; y=0; r1=0; r2=0; r3=0; r4=0; }
 };
-
-// IRIW needs 4 threads — we use a slightly different runner
 void run_IRIW() {
     const int ITERATIONS = 10000;
     ResultMap results;
@@ -203,17 +152,7 @@ void run_IRIW() {
         "  Two observers cannot see writes in different orders. Safe on x86.\n"
         "  On ARMv8 this is allowed.");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 5: CoRR — Coherence (same variable)
-// ─────────────────────────────────────────────────────────────────────────────
-// Thread 1: x=1
-// Thread 2: x=2
-// Thread 3: r1=x; r2=x
-// Thread 4: r3=x; r4=x
-//
-// All observers must agree on the write order to x.
-// ─────────────────────────────────────────────────────────────────────────────
+// CoRR 
 struct CoRR_State {
     std::atomic<int> x{0};
     int r1{0}, r2{0}, r3{0}, r4{0};
@@ -225,8 +164,6 @@ void run_CoRR() {
     cfg.name        = "CoRR (Cache Coherence)";
     cfg.description = "All threads must see same write order to x";
     cfg.iterations  = 500'000;
-
-    // Use 2-thread version: T1 writes x=1, T2 reads x twice
     struct State2 {
         std::atomic<int> x{0};
         int r1{0}, r2{0};
@@ -250,14 +187,7 @@ void run_CoRR() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TEST 6: WRC — Write-to-Read Causality
-// ─────────────────────────────────────────────────────────────────────────────
-// Thread 1: x=1
-// Thread 2: r1=x; y=r1
-// Thread 3: r2=y; r3=x
-//
-// If r2=1 (saw y=1), must r3=1?  On SC: yes. On TSO: yes. On ARM: maybe not.
-// ─────────────────────────────────────────────────────────────────────────────
+// WRC 
 struct WRC_State {
     std::atomic<int> x{0}, y{0};
     int r1{0}, r2{0}, r3{0};
@@ -269,7 +199,6 @@ void run_WRC() {
     cfg.name        = "WRC (Write-Read Causality)";
     cfg.description = "If T3 sees y=1, must it also see x=1?";
     cfg.iterations  = 500'000;
-    // Simplified to 2-thread for harness compatibility
     run_test<WRC_State>(cfg,
         [](WRC_State& s, bool) {
             s.x.store(1, std::memory_order_relaxed);
@@ -286,19 +215,13 @@ void run_WRC() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 7: SB+fence — Store Buffering WITH barriers
-// Shows that mfence fixes the SB outcome
-// ─────────────────────────────────────────────────────────────────────────────
+// SB+fence 
 void run_SB_with_fence() {
     std::cout << "\n>>> Running SB WITH mfence barriers:\n";
     run_SB(true);
     std::cout << "[SB+fence] With mfence, r1=0 && r2=0 should disappear completely.\n\n";
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 8: RWC — Read-Write Causality
-// ─────────────────────────────────────────────────────────────────────────────
+// RWC 
 struct RWC_State {
     std::atomic<int> x{0}, y{0};
     int r1{0}, r2{0};
@@ -325,9 +248,7 @@ void run_RWC() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 9: N6 — 3 variables, 3 threads (classic)
-// ─────────────────────────────────────────────────────────────────────────────
+// N6 
 struct N6_State {
     std::atomic<int> x{0}, y{0}, z{0};
     int r1{0}, r2{0};
@@ -354,9 +275,7 @@ void run_N6() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 10: 2+2W — Two stores, two loads on opposite vars
-// ─────────────────────────────────────────────────────────────────────────────
+// 2+2W 
 struct W2_State {
     std::atomic<int> x{0}, y{0};
     int r1{0}, r2{0};
@@ -383,9 +302,7 @@ void run_2plus2W() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 11: DEKKER — Dekker's mutual exclusion (relies on memory ordering)
-// ─────────────────────────────────────────────────────────────────────────────
+// DEKKER 
 struct Dekker_State {
     std::atomic<int> flag0{0}, flag1{0};
     int in_cs0{0}, in_cs1{0}; // both in critical section?
@@ -419,9 +336,7 @@ void run_DEKKER() {
               << "         Without barriers this can happen on x86 due to store buffering.\n\n";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST 12: ISA2 — 3-thread causality chain
-// ─────────────────────────────────────────────────────────────────────────────
+// ISA2 
 struct ISA2_State {
     std::atomic<int> x{0}, y{0}, z{0};
     int r1{0}, r2{0}, r3{0};
