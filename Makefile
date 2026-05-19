@@ -1,4 +1,4 @@
-# ── Linux / macOS ─────────────────────────────────────────
+
 CXX      = g++
 CXXFLAGS = -O2 -std=c++17 -pthread -march=native -Wall
 
@@ -14,8 +14,6 @@ run: $(TARGET)
 
 clean:
 	rm -f $(TARGET)
-
-# ── Windows (uncomment if using nmake) ────────────────────
 # CXX = cl
 # CXXFLAGS = /O2 /std:c++17 /EHsc
 # TARGET = litmus.exe
