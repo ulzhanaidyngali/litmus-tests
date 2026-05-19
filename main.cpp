@@ -1,14 +1,4 @@
-// =============================================================================
-// main.cpp  —  Litmus Test Runner
-// =============================================================================
-// Compile (Linux):
-//   g++ -O2 -std=c++17 -pthread main.cpp -o litmus
-//   ./litmus
-//
-// Compile (Windows):
-//   cl /O2 /std:c++17 main.cpp /Fe:litmus.exe
-//   litmus.exe
-// =============================================================================
+
 
 #include "harness.h"
 #include "tests.h"
