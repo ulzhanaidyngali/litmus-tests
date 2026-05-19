@@ -82,3 +82,25 @@ y = 1;
 The forbidden outcome would violate causality between operations.
 
 x86 prevents this behavior because of its stronger TSO memory model.
+
+
+
+## LB, IRIW and CoRR Analysis
+
+### LB Test
+LB means Load Buffering.
+Thread 1 reads x first and then writes y = 1. Thread 2 reads y first and then writes x = 1.
+The interesting result is r1 = 1 and r2 = 1.
+On x86 this result should not appear, because x86-TSO does not allow load-to-store reordering. This means the processor does not freely change the order between reading and writing in this case.
+
+### IRIW Test
+IRIW means Independent Reads of Independent Writes.
+There are four threads. Thread 1 writes x = 1. Thread 2 writes y = 1. Thread 3 reads x and then y. Thread 4 reads y and then x.
+The forbidden result is when two reader threads see the writes in different orders. For example, one thread sees x first, but another thread sees y first.
+On x86 this should not happen, because x86-TSO has a single global store order. All cores should observe writes in the same order.
+
+### CoRR Test
+CoRR means Coherent Read-Read or Cache Coherence.
+One thread writes x = 1 and then x = 2. Another thread reads x two times.
+The forbidden result is r1 = 2 and r2 = 1. It means the thread first saw the newer value and then saw the older value.
+This should not happen on x86 or any coherent system, because all cores must see writes to the same memory location in the same order.
